@@ -74,3 +74,8 @@ compileTestKotlin {
         jvmTarget = "11"
     }
 }
+
+// Remove version number from jar name for deployment
+bootJar {
+    archiveFileName = "${archiveBaseName.get()}.${archiveExtension.get()}"
+}

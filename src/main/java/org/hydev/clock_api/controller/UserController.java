@@ -28,16 +28,36 @@ public class UserController {
         this.userRepository = userRepository;
     }
 
-    @PostMapping("/register")
-    // https://www.baeldung.com/spring-rest-http-headers
-    // TODO: This method should be synchronized to avoid race condition.
-    // Also, this method should not be private, or else cannot use userRepository.
+    /**
+     * Create salted hash for user's password
+     * Format: "$username + $password".toLowerMd5();
+     *
+     * @param username Unique username used as a salt
+     * @param password Password initial hash
+     * @return Salted hash
+     */
+    private static String userToSaltedMd5(String username, String password) {
+        String beforeMd5 = String.format("%s + %s", username, password);
+        return DigestUtils.md5DigestAsHex(beforeMd5.getBytes()).toLowerCase();
+    }
 
-    // TODO: 2021/1/22 Need a better design!
-    // Controller Return error code list as List<String>, or return uuid as String.
+    /**
+     * Register a user to the database.
+     * <p>
+     * https://www.baeldung.com/spring-rest-http-headers
+     * This method should be synchronized to avoid race condition.
+     * Also, this method should not be private, or else cannot use userRepository.
+     * <p>
+     * TODO: 2021/1/22 Need a better design!
+     * Controller Return error code list as List<String>, or return uuid as String.
+     *
+     * @param username Unique username (Not empty, and should match the regex {@code User.RE_USERNAME})
+     * @param password Password initial hash (Not empty)
+     * @return Success or error
+     */
+    @PostMapping("/register")
     @SuppressWarnings("rawtypes")
     public synchronized ResponseEntity register(
-            // username & password shouldn't be null, and should match thr regex.
             // [!] @RequestHeader(required = false) makes no need make another error handler.
             // [!] And also, ExceptionHandler of MissingRequestHeaderException cannot deal with all missing fields.
             @Pattern(regexp = User.RE_USERNAME, message = ErrorCode.USER_NAME_NOT_MATCH_REGEX)
@@ -60,14 +80,17 @@ public class UserController {
         return ResponseEntity.ok(user.getUuid());
     }
 
-    // Format: "$username + $password".toLowerMd5();
-    private String userToSaltedMd5(String username, String password) {
-        String beforeMd5 = String.format("%s + %s", username, password);
-        return DigestUtils.md5DigestAsHex(beforeMd5.getBytes()).toLowerCase();
-    }
-
-    // Check username & password.
-    // user not exists -> http 404, password not match -> http 401; all match -> do and return do's result String.
+    /**
+     * Check username & password.
+     * - User doesn't exist -> http 404
+     * - Password doesn't match -> http 401
+     * - All match -> Execute operation and return the resulting String.
+     *
+     * @param username  Unique username
+     * @param password  Password initial hash
+     * @param operation Callback on success
+     * @return Callback result or the error response
+     */
     private ResponseEntity<String> checkPasswordAndDo(String username, String password,
                                                       Function<User, String> operation) {
         User user = userRepository.queryByUsername(username);
@@ -88,7 +111,7 @@ public class UserController {
         });
     }
 
-    @PostMapping("login")
+    @PostMapping("/login")
     public synchronized ResponseEntity<String> login(@RequestHeader String username, @RequestHeader String password) {
         return checkPasswordAndDo(username, password, user -> userRepository.queryByUsername(username).getUuid());
     }
